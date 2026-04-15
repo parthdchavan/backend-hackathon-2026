@@ -11,21 +11,33 @@ router = APIRouter(prefix="/objections", tags=["objections"])
 
 @router.post("/", response_model=ObjectionResponse)
 def create_objection(objection: ObjectionCreate, db: Session = Depends(get_db)):
-    result = llm_response(objection.objection_text)
-    
-    db_objection = Objection(
-        objection_text=objection.objection_text,
-        response=result["response"],
-        category=result["category"],
-        severity=result["severity"],
-        embedding=result["embedding"]
-    )
-    
-    db.add(db_objection)
-    db.commit()
-    db.refresh(db_objection)
-    
-    return db_objection
+    try:
+        result = llm_response(objection.objection_text)
+        
+        # Validate all required fields are present
+        if not result.get("response"):
+            raise ValueError("LLM response is empty")
+        if not result.get("category"):
+            raise ValueError("Category is missing")
+        if not result.get("severity"):
+            raise ValueError("Severity is missing")
+        
+        db_objection = Objection(
+            objection_text=objection.objection_text,
+            response=result["response"],
+            category=result["category"],
+            severity=result["severity"],
+            embedding=result.get("embedding", "")
+        )
+        
+        db.add(db_objection)
+        db.commit()
+        db.refresh(db_objection)
+        
+        return db_objection
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error processing objection: {str(e)}")
 
 @router.get("/", response_model=List[ObjectionResponse])
 def get_objections(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
