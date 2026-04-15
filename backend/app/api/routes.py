@@ -1,0 +1,66 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+
+from ..database import get_db
+from ..models import Objection
+from ..schemas import ObjectionCreate, ObjectionResponse
+from ..services.LLM_service.llm_client import response as llm_response
+from ..auth import verify_token
+
+router = APIRouter(prefix="/objections", tags=["objections"])
+
+@router.post("/", response_model=ObjectionResponse)
+def create_objection(
+    objection: ObjectionCreate, 
+    db: Session = Depends(get_db),
+    authorized: bool = Depends(verify_token)
+):
+    try:
+        result = llm_response(objection.objection_text)
+        
+        # Validate all required fields are present
+        if not result.get("response"):
+            raise ValueError("LLM response is empty")
+        if not result.get("category"):
+            raise ValueError("Category is missing")
+        if not result.get("severity"):
+            raise ValueError("Severity is missing")
+        
+        db_objection = Objection(
+            objection_text=objection.objection_text,
+            response=result["response"],
+            category=result["category"],
+            severity=result["severity"],
+            embedding=result.get("embedding", "")
+        )
+        
+        db.add(db_objection)
+        db.commit()
+        db.refresh(db_objection)
+        
+        return db_objection
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error processing objection: {str(e)}")
+
+@router.get("/", response_model=List[ObjectionResponse])
+def get_objections(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db),
+    authorized: bool = Depends(verify_token)
+):
+    objections = db.query(Objection).offset(skip).limit(limit).all()
+    return objections
+
+@router.get("/{objection_id}", response_model=ObjectionResponse)
+def get_objection(
+    objection_id: int, 
+    db: Session = Depends(get_db),
+    authorized: bool = Depends(verify_token)
+):
+    objection = db.query(Objection).filter(Objection.id == objection_id).first()
+    if not objection:
+        raise HTTPException(status_code=404, detail="Objection not found")
+    return objection
