@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from .prompt_builder import SYSTEM_PROMPT, FEW_SHOT_EXAMPLES
 
 client = OpenAI(
     base_url=os.getenv("OPENROUTER_BASE_URL"),
@@ -25,18 +26,29 @@ def preprocess(text: str) -> str:
 
 
 def call_llm(prompt: str) -> str:
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        *FEW_SHOT_EXAMPLES,
+        {"role": "user", "content": prompt},
+    ]
+
     response = client.chat.completions.create(
         model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
         max_tokens=300,
     )
     return response.choices[0].message.content.strip()
 
 
 def call_llm_json(prompt: str) -> dict:
+    messages = [
+        {"role": "system", "content": "You are a JSON-only response generator. Respond with valid JSON only, no markdown or extra text."},
+        {"role": "user", "content": prompt},
+    ]
+
     response = client.chat.completions.create(
         model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
         max_tokens=100,
     )
     raw = response.choices[0].message.content.strip()
