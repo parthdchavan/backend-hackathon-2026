@@ -3,8 +3,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Load .env from parent directory
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(env_path)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./objections.db")
 
