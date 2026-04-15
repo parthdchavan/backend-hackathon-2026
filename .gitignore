@@ -1,0 +1,13 @@
+# Environment and secrets
+.env
+*.env
+backend/.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
